@@ -20,7 +20,7 @@ class KinoPub:
         self.refresh = refresh
 
     async def api(self, path, params=None, method='GET'):
-        headers = {'Authorization': 'Bearer ' + self.token}
+        headers = {'Authorization': 'Bearer ' + self.token, 'Accept-Encoding': 'br'}
         async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as s:
             if method == 'GET':
                 response = await s.get(f'https://api.service-kp.com/v1{path}', params=params)
