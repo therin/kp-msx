@@ -1,0 +1,11 @@
+.git
+.gitignore
+.idea
+__pycache__
+*.pyc
+*.db
+kp-sqlite.db
+README.md
+fly.toml
+.dockerignore
+Dockerfile
