@@ -1,0 +1,39 @@
+# kp-msx on Fly.io — Kinopub→MSX bridge for the LG C5 in Tomsk.
+# Hosting decision + runbook: homelab repo `kp-msx-hosting/README.md`.
+# Single always-on Machine in Frankfurt, SQLite on a Fly Volume, no Cloudflare.
+app = "mx-relay-853992fe"
+primary_region = "fra"
+
+[build]
+
+[env]
+  # Public base URL kp-msx injects into MSX links. Swap to the custom domain
+  # once DNS (unproxied A -> dedicated Fly IPv4) is in place.
+  MSX_HOST = "https://mx-relay-853992fe.fly.dev"
+  SQLITE_URL = "/data/kp.db"
+  PORT = "8080"
+
+# Kinopub OAuth tokens + device registry live here. Local to this one Machine —
+# back it up (litestream / sqlite3 .backup) per the runbook.
+[mounts]
+  source = "kp_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Always-on: never stop the Machine (single SQLite writer, elderly-UX cold-start).
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/msx/start.json"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
