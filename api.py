@@ -37,6 +37,13 @@ UNAUTHORIZED = [
     ENDPOINT + '/proxy'
 ]
 
+# Per-device consecutive /msx/menu auth failures tolerated before we treat the
+# device as genuinely unlinked and delete it (forcing re-pair). Keeps a single
+# transient Kinopub failure from re-pairing a working TV. Single-worker, in-memory
+# (resets on restart, which is fine); only registered devices ever populate it.
+MENU_FAIL_THRESHOLD = 3
+_menu_fail_counts = {}
+
 
 @app.middleware('http')
 async def auth(request: Request, call_next):
@@ -101,16 +108,29 @@ async def start(request: Request):
 
 @app.get(ENDPOINT + '/menu')
 async def menu(request: Request):
-    if not request.state.device.registered():
+    device = request.state.device
+    if not device.registered():
         return msx.unregistered_menu()
 
-    categories = await request.state.device.kp.get_content_categories()
+    categories = await device.kp.get_content_categories()
     if categories is None:
-        request.state.device.delete()
-        return msx.unregistered_menu()
+        # A None here means a 401 whose token refresh failed (or whose post-refresh
+        # retry still 401'd). Either way, don't nuke a working
+        # device on a single failure — a transient Kinopub error would otherwise dump
+        # the user back to the pairing screen. Only treat it as a genuine unlink
+        # (delete -> re-pair, preserving issue #6) after repeated confirmed failures;
+        # otherwise show a retryable "kino.pub unavailable" panel and keep the tokens.
+        fails = _menu_fail_counts.get(device.id, 0) + 1
+        if fails >= MENU_FAIL_THRESHOLD:
+            _menu_fail_counts.pop(device.id, None)
+            device.delete()
+            return msx.unregistered_menu()
+        _menu_fail_counts[device.id] = fails
+        return msx.handle_exception()
+    _menu_fail_counts.pop(device.id, None)
     categories += Category.static_categories()
     for category in categories:
-        if category.id in request.state.device.settings.menu_blacklist:
+        if category.id in device.settings.menu_blacklist:
             category.blacklisted = True
     return msx.registered_menu(categories)
 

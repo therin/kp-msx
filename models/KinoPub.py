@@ -19,7 +19,7 @@ class KinoPub:
         self.token = token
         self.refresh = refresh
 
-    async def api(self, path, params=None, method='GET'):
+    async def api(self, path, params=None, method='GET', _reauthed=False):
         headers = {'Authorization': 'Bearer ' + self.token, 'Accept-Encoding': 'br'}
         async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as s:
             if method == 'GET':
@@ -28,9 +28,15 @@ class KinoPub:
                 response = await s.request(method, f'https://api.service-kp.com/v1{path}', json=params)
 
             if response.status == 401:
+                # Already retried once after a refresh — give up instead of recursing forever.
+                if _reauthed:
+                    return None
                 reauth_result = await self.refresh_tokens()
                 if reauth_result:
-                    return await self.api(path, params=params)
+                    # Preserve the original HTTP method on retry. Previously this dropped
+                    # `method`, silently re-issuing POSTs (play / settings / mark-watched) as
+                    # GET right after a token refresh.
+                    return await self.api(path, params=params, method=method, _reauthed=True)
                 else:
                     return None
             result = await response.json()
