@@ -38,6 +38,9 @@ def update_device_user_agent(id, user_agent):
 def update_device_settings(id, param):
     return devices.update_one({'id': id}, {'$set': {'settings': param}})
 
+def count_registered_devices():
+    return devices.count_documents({'token': {'$ne': None}})
+
 def get_domain(domain):
     return domains.find_one({'domain': domain})
 

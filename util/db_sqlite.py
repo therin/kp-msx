@@ -124,6 +124,19 @@ def update_device_settings(id, param):
     return to_device_dict(cursor.fetchone())
 
 
+def count_registered_devices():
+    # Open a short-lived read connection so the Prometheus collector (which may
+    # run in a different thread than the module-level autocommit connection) is
+    # thread-safe. A COUNT on a tiny table is cheap; called once per scrape.
+    conn = sqlite3.connect(config.SQLITE_URL)
+    try:
+        return conn.execute(
+            'SELECT COUNT(*) FROM devices WHERE token IS NOT NULL'
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+
 def get_domain(domain):
     cursor = connection.execute(
         '''

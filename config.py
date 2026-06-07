@@ -14,3 +14,12 @@ KP_CLIENT_SECRET = os.environ.get('KP_CLIENT_SECRET') or 'cgg3gtifu46urtfp2zp1nq
 QUALITY = os.environ.get('QUALITY')
 PROTOCOL = os.environ.get('PROTOCOL') or 'hls4'
 TIZEN = os.environ.get('TIZEN') == 'yes'
+
+# Bearer token guarding the public /metrics endpoint (Prometheus scrape auth).
+# Unset -> /metrics fails closed (403). Set as a Fly secret, never in the repo.
+METRICS_TOKEN = os.environ.get('METRICS_TOKEN')
+
+# Telegram operational alerts (e.g. new device paired). Unset -> alerts are no-ops.
+# Set as Fly secrets, never in the repo.
+TELEGRAM_ALERT_BOT_TOKEN = os.environ.get('TELEGRAM_ALERT_BOT_TOKEN')
+TELEGRAM_ALERT_CHAT_ID = os.environ.get('TELEGRAM_ALERT_CHAT_ID')

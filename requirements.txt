@@ -4,3 +4,4 @@ fastapi~=0.110.2
 aiohttp~=3.9.5
 aiohttp[speedups]
 brotli-asgi~=1.6.0
+prometheus-fastapi-instrumentator~=7.0.0

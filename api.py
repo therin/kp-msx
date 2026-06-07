@@ -4,6 +4,8 @@ import uvicorn
 from brotli_asgi import BrotliMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, FileResponse, Response
@@ -13,7 +15,7 @@ from models.Category import Category
 from models.Content import Content
 from models.Device import Device
 from models.KinoPub import KinoPub
-from util import msx, proxy
+from util import msx, proxy, metrics, alert
 
 app = FastAPI()
 app.add_middleware(
@@ -26,6 +28,12 @@ app.add_middleware(
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(BrotliMiddleware, minimum_size=1000)
+
+# Default HTTP request metrics (rate / status / latency = "load"). instrument()
+# only wires the middleware; we expose /metrics ourselves below so we can guard
+# it with a bearer token. Custom collector for kpmsx_devices is registered here.
+Instrumentator().instrument(app)
+metrics.init()
 
 ENDPOINT = '/msx'
 UNAUTHORIZED = [
@@ -49,6 +57,17 @@ _menu_fail_counts = {}
 async def auth(request: Request, call_next):
     if request.method == 'OPTIONS':
         return await call_next(request)
+
+    # Guard /metrics here, BEFORE any device lookup/create. /metrics is public on
+    # Fly, so an unauthenticated /metrics?id=x must NOT fall through to the device
+    # logic below (which would create a row and inflate kpmsx_devices). Fail closed
+    # when the token is unset.
+    if request.url.path == '/metrics':
+        token = config.METRICS_TOKEN
+        if not token or request.headers.get('authorization') != f'Bearer {token}':
+            return Response(status_code=403)
+        return await call_next(request)
+
     device_id = request.query_params.get('id')
 
     if device_id is None and str(request.url.path) not in UNAUTHORIZED:
@@ -104,6 +123,12 @@ async def subtitle_editor(request: Request):
 async def start(request: Request):
     return msx.start()
 
+# Prometheus scrape target. Auth (bearer token) is enforced in the `auth`
+# middleware above; by the time we get here the request is already authorised.
+@app.get('/metrics')
+async def metrics_endpoint(request: Request):
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 # General endpoints
 
 @app.get(ENDPOINT + '/menu')
@@ -152,6 +177,10 @@ async def check_registration(request: Request):
         return msx.code_not_entered()
     request.state.device.update_tokens(result['access_token'], result['refresh_token'])
     await request.state.device.notify()
+    metrics.REGISTRATIONS.inc()
+    await alert.send_telegram(
+        alert.new_device_message(request.state.device.id, request.state.device.user_agent)
+    )
     return msx.restart()
 
 
@@ -296,6 +325,7 @@ async def single_collection(request: Request):
 
 @app.post(ENDPOINT + '/play')
 async def play(request: Request):
+    metrics.PLAY.inc()
     content_id = request.query_params.get('content_id')
     season = request.query_params.get('season')
     episode = request.query_params.get('episode')
@@ -436,6 +466,7 @@ async def proxy_req(request: Request):
         code, content_type, contents = await proxy.get(url)
     except:
         return Response(status_code=403)
+    metrics.PROXY.inc()
     return Response(contents, code, media_type=content_type)
 
 

@@ -34,3 +34,6 @@ def update_tokens(token, newToken, refresh):
 
 def delete_device(id):
     return db.delete_device(id)
+
+def count_registered_devices():
+    return db.count_registered_devices()
