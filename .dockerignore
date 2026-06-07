@@ -1,10 +1,27 @@
+# Build-context hygiene: keep VCS, IDE, caches, and—critically—any local SQLite
+# DB or secrets out of the image. `COPY . .` would otherwise bake Kinopub OAuth
+# tokens (kp.db + its -wal/-shm sidecars) or a stray .env into the layer.
 .git
 .gitignore
 .idea
 __pycache__
 *.pyc
+
+# SQLite DBs and their WAL/SHM sidecars (dev default is ./kp-sqlite.db).
 *.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
 kp-sqlite.db
+data/
+
+# Secrets — never copy real env files; allow a committed example.
+.env
+.env.*
+!.env.example
+
+# Not needed inside the image.
 README.md
 fly.toml
 .dockerignore

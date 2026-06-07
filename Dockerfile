@@ -2,7 +2,12 @@
 # Self-hosted for the LG C5 in Tomsk (russia2026 move project).
 # Hosting decision + deploy runbook: homelab repo `kp-msx-hosting/README.md`
 # (Fly.io EU, SQLite on a Fly Volume, no Cloudflare).
-FROM python:3.12-slim
+#
+# Base image pinned by digest for reproducible/portable rebuilds (RKN volatility =
+# we may have to redeploy elsewhere on short notice). Refresh with:
+#   docker pull python:3.12-slim-bookworm && \
+#   docker inspect --format '{{index .RepoDigests 0}}' python:3.12-slim-bookworm
+FROM python:3.12-slim-bookworm@sha256:93ab4b7fa528b25124c97bcc755415e60eb671a86b4dbe0328df2fe2d1c1193d
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
