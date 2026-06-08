@@ -38,13 +38,7 @@ class Playable:
     def msx_properties(self, device_settings: 'DeviceSettings' = None):
         props = {
             'resume:key': self.resume_key(),
-            'trigger:ready': self.trigger_ready(),
-            # BACK during fullscreen playback otherwise leaves the video running in
-            # the background behind the menu with no way to return. trigger:back fires
-            # only on the BACK key (NOT on opening the audio/subtitle/settings panel,
-            # which is a player-button action), so eject the player on BACK: playback
-            # stops cleanly and re-selecting resumes via resume:key. MSX 0.1.58+.
-            'trigger:back': 'player:eject'
+            'trigger:ready': self.trigger_ready()
         }
 
         props.update(msx.DEFAULT_PLAY_BUTTON_PROPS)

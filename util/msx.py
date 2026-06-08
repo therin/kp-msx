@@ -67,15 +67,37 @@ def unregistered_menu():
     }
 
 
+def resume_playback_item():
+    # MSX keeps the video playing in the BACKGROUND when the user presses BACK
+    # (it dims the video and shows the menu on top). There is no built-in,
+    # discoverable way back to the running player, so expose one: this menu item
+    # runs the `player:show` action, which brings the backgrounded player back to
+    # fullscreen. It is always present; if nothing is playing, player:show is a
+    # harmless no-op/warning. Kept at the top of the menu so it is the first thing
+    # visible when the menu opens over a backgrounded video.
+    return {
+        "type": "default",
+        "icon": "play-circle-outline",
+        "label": "Вернуться к видео",
+        # A menu item's `data` is the content to load on select, not a bare action
+        # string; the documented-safe way to run a control action is a content-root
+        # with an `action`. player:show re-foregrounds the backgrounded player.
+        "data": {
+            "action": "player:show"
+        }
+    }
+
+
 def registered_menu(categories: 'List[Category]'):
     menu = [category.to_msx() for category in categories or [] if not category.blacklisted]
     if len(menu) == 0:
         menu = [sad_screen()]
+    menu = [resume_playback_item()] + menu
     entry = {
         "reuse": False,
         "cache": False,
         "restore": False,
-        "refocus": 1,
+        "refocus": 2,
         "headline": "kino.pub",
         "options": settings_screen(),
         "menu": menu,
