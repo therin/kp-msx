@@ -446,6 +446,13 @@ async def toggle_menu_entry(request: Request):
     request.state.device.reset_menu()
     return msx.restart()
 
+
+@app.get(ENDPOINT + '/resume')
+async def resume(request: Request):
+    # Page for the "Вернуться к видео" menu item: a focused button whose
+    # action (player:show) re-foregrounds the backgrounded player when pressed.
+    return msx.resume_content()
+
 # Errors
 
 @app.get(ENDPOINT + '/error')

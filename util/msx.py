@@ -69,22 +69,51 @@ def unregistered_menu():
 
 def resume_playback_item():
     # MSX keeps the video playing in the BACKGROUND when the user presses BACK
-    # (it dims the video and shows the menu on top). There is no built-in,
-    # discoverable way back to the running player, so expose one: this menu item
-    # runs the `player:show` action, which brings the backgrounded player back to
-    # fullscreen. It is always present; if nothing is playing, player:show is a
-    # harmless no-op/warning. Kept at the top of the menu so it is the first thing
-    # visible when the menu opens over a backgrounded video.
+    # (it dims the video and shows the menu on top). Expose a discoverable way
+    # back: this menu item loads the /msx/resume PAGE, which contains a single
+    # focused button whose `action: player:show` re-foregrounds the player.
+    # Why a button page rather than a one-press menu action: a menu item's `data`
+    # is content-only, not an action slot — bare "player:show" gives "invalid data
+    # id", an inline {action:...} gives "Content Not Available", and the root/ready
+    # on-load hooks fire only flakily on the C5. A CONTENT-ITEM button's `action`
+    # (the same mechanism as the "Смотреть" button and the pairing screen) is the
+    # reliable path; cost is one extra press. Placed at the BOTTOM of the menu
+    # (MSX can't conditionally show a menu item only while playing).
     return {
         "type": "default",
         "icon": "play-circle-outline",
         "label": "Вернуться к видео",
-        # A menu item's `data` is the content to load on select, not a bare action
-        # string; the documented-safe way to run a control action is a content-root
-        # with an `action`. player:show re-foregrounds the backgrounded player.
-        "data": {
-            "action": "player:show"
-        }
+        "data": format_action('/msx/resume')
+    }
+
+
+def resume_content():
+    # Page opened from the "Вернуться к видео" menu item. Mirrors the structure of
+    # registration() (which renders reliably): an explanatory space + one focused
+    # button. Pressing the button runs player:show to bring the backgrounded video
+    # back to fullscreen. If nothing is playing, player:show is a harmless no-op.
+    return {
+        "type": "pages",
+        "headline": "Вернуться к видео",
+        "pages": [
+            {
+                "items": [
+                    {
+                        "type": "space",
+                        "layout": "0,0,6,2",
+                        "title": "Видео в фоне",
+                        "titleFooter": "Если фильм или серия ещё воспроизводятся, нажмите кнопку ниже, чтобы вернуться к просмотру."
+                    },
+                    {
+                        "type": "button",
+                        "layout": "0,2,6,1",
+                        "label": "Продолжить просмотр",
+                        "action": "player:show",
+                        "focus": True
+                    }
+                ]
+            }
+        ]
     }
 
 
@@ -92,12 +121,12 @@ def registered_menu(categories: 'List[Category]'):
     menu = [category.to_msx() for category in categories or [] if not category.blacklisted]
     if len(menu) == 0:
         menu = [sad_screen()]
-    menu = [resume_playback_item()] + menu
+    menu = menu + [resume_playback_item()]
     entry = {
         "reuse": False,
         "cache": False,
         "restore": False,
-        "refocus": 2,
+        "refocus": 1,
         "headline": "kino.pub",
         "options": settings_screen(),
         "menu": menu,
