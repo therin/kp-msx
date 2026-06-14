@@ -9,6 +9,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 import config
 from models.Category import Category
@@ -45,6 +46,12 @@ UNAUTHORIZED = [
     ENDPOINT + '/proxy'
 ]
 
+
+def _is_public_path(path: str) -> bool:
+    # Player plugin page + its static assets are loaded by the TV with `?url=` and
+    # no `?id=`, so they must bypass device auth like the other static pages.
+    return path in UNAUTHORIZED or path.startswith('/player/')
+
 # Per-device consecutive /msx/menu auth failures tolerated before we treat the
 # device as genuinely unlinked and delete it (forcing re-pair). Keeps a single
 # transient Kinopub failure from re-pairing a working TV. Single-worker, in-memory
@@ -70,7 +77,7 @@ async def auth(request: Request, call_next):
 
     device_id = request.query_params.get('id')
 
-    if device_id is None and str(request.url.path) not in UNAUTHORIZED:
+    if device_id is None and not _is_public_path(str(request.url.path)):
         result = JSONResponse({
             'response': {
                 'status': 200,
@@ -81,7 +88,7 @@ async def auth(request: Request, call_next):
         result.headers['Access-Control-Allow-Origin'] = '*'
         return result
 
-    if device_id == '{ID}' and str(request.url.path) not in UNAUTHORIZED:
+    if device_id == '{ID}' and not _is_public_path(str(request.url.path)):
         result = JSONResponse(msx.unsupported_version())
         result.headers['Access-Control-Allow-Credentials'] = 'true'
         result.headers['Access-Control-Allow-Origin'] = '*'
@@ -118,6 +125,12 @@ async def subtitle_editor(request: Request):
 @app.get('/paging.js')
 async def subtitle_editor(request: Request):
     return FileResponse('pages/paging.js')
+
+# Self-hosted hls.js player (our fork of slonopot/msx-hlsx) — tuned retries + quiet
+# transient-network-error handling for RKN-throttled segment CDNs. Served from our
+# own domain (vendored hls.js, no jsdelivr). Point the PLAYER env at
+# https://<MSX_HOST>/player/hlsx.html to use it. Auth-exempt via _is_public_path.
+app.mount('/player', StaticFiles(directory='pages/player'), name='player')
 
 @app.get(ENDPOINT + '/start.json')
 async def start(request: Request):
